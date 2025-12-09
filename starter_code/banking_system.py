@@ -22,6 +22,7 @@ class BankingSystem(ABC):
             self.accounts[account_id]["account_created"] = timestamp
             self.accounts[account_id]["balance"] = 0
             self.accounts[account_id]["deposits"] = {}
+            self.accounts[account_id]["transfers"] = {}
             return True
 
     def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
@@ -33,8 +34,8 @@ class BankingSystem(ABC):
         If the specified account doesn't exist, should return
         `None`.
         """
-        if self.accounts[account_id]:  
-          self.accounts[account_id]["deposits"]["timestamp"] = amount
+        if account_id in self.accounts:  
+          self.accounts[account_id]["deposits"][timestamp] = amount
           self.accounts[account_id]["balance"] += amount
           return self.accounts[account_id]["balance"]
         else:
@@ -53,12 +54,20 @@ class BankingSystem(ABC):
           * Returns `None` if account `source_account_id` has
           insufficient funds to perform the transfer.
         """
-        if self.accounts[source_account_id] & self.accounts[target_account_id]:
-            if self.accounts[source_account_id] == self.accounts[target_account_id]:
-                return None
-            else:
+        if source_account_id not in self.accounts or target_account_id not in self.accounts:
+            return None
+        if source_account_id == target_account_id:
+              return None
         else:
-          return None
+            if self.accounts[source_account_id]["balance"] - amount > 0:
+              self.accounts[source_account_id]["balance"] -= amount
+              self.accounts[target_account_id]["balance"] += amount
+              self.accounts[target_account_id]["deposits"][timestamp] = timestamp
+              self.accounts[source_account_id]["transfers"][timestamp] = timestamp
+              return self.accounts[source_account_id]["balance"]
+            else:
+              return None
+            
 
     def top_spenders(self, timestamp: int, n: int) -> list[str]:
         """
