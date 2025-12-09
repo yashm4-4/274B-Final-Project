@@ -18,7 +18,10 @@ class BankingSystem(ABC):
         if account_id in self.accounts:
             return False
         else:
-            self.accounts[account_id] = []
+            self.accounts[account_id] = {}
+            self.accounts[account_id]["account_created"] = timestamp
+            self.accounts[account_id]["balance"] = 0
+            self.accounts[account_id]["deposits"] = {}
             return True
 
     def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
@@ -30,8 +33,12 @@ class BankingSystem(ABC):
         If the specified account doesn't exist, should return
         `None`.
         """
-        # default implementation
-        return None
+        if self.accounts[account_id]:  
+          self.accounts[account_id]["deposits"]["timestamp"] = amount
+          self.accounts[account_id]["balance"] += amount
+          return self.accounts[account_id]["balance"]
+        else:
+          return None
 
     def transfer(self, timestamp: int, source_account_id: str, target_account_id: str, amount: int) -> int | None:
         """
@@ -46,8 +53,12 @@ class BankingSystem(ABC):
           * Returns `None` if account `source_account_id` has
           insufficient funds to perform the transfer.
         """
-        # default implementation
-        return None
+        if self.accounts[source_account_id] & self.accounts[target_account_id]:
+            if self.accounts[source_account_id] == self.accounts[target_account_id]:
+                return None
+            else:
+        else:
+          return None
 
     def top_spenders(self, timestamp: int, n: int) -> list[str]:
         """
