@@ -1,4 +1,5 @@
 from abc import ABC
+import numpy as np
 
 
 class BankingSystem(ABC):
@@ -59,11 +60,11 @@ class BankingSystem(ABC):
         if source_account_id == target_account_id:
               return None
         else:
-            if self.accounts[source_account_id]["balance"] - amount > 0:
+            if self.accounts[source_account_id]["balance"] - amount >= 0:
               self.accounts[source_account_id]["balance"] -= amount
               self.accounts[target_account_id]["balance"] += amount
-              self.accounts[target_account_id]["deposits"][timestamp] = timestamp
-              self.accounts[source_account_id]["transfers"][timestamp] = timestamp
+              self.accounts[target_account_id]["deposits"][timestamp] = amount
+              self.accounts[source_account_id]["transfers"][timestamp] = amount
               return self.accounts[source_account_id]["balance"]
             else:
               return None
@@ -87,7 +88,8 @@ class BankingSystem(ABC):
           should not be reflected in the calculations for total
           outgoing transactions.
         """
-        # default implementation
+        transfer_amounts = [np.sum(self.accounts[account_id]["transfers"][timestamp]) for timestamp in self.accounts[account_id]["transfers"] for account_id in self.accounts]
+        
         return []
 
     def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
