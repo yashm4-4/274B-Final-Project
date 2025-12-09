@@ -5,6 +5,8 @@ class BankingSystem(ABC):
     """
     `BankingSystem` interface.
     """
+    def __init__(self):
+      self.accounts = {}
 
     def create_account(self, timestamp: int, account_id: str) -> bool:
         """
@@ -13,8 +15,11 @@ class BankingSystem(ABC):
         Returns `True` if the account was successfully created or
         `False` if an account with `account_id` already exists.
         """
-        # default implementation
-        return False
+        if account_id in self.accounts:
+            return False
+        else:
+            self.accounts[account_id] = []
+            return True
 
     def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
         """
