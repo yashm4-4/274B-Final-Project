@@ -345,7 +345,7 @@ class BankingSystemImpl(BankingSystem):
         account_id: unique account identifier
         time_at: query timestamp to look up account balance
         """
-        
+        #this may be wrong if we need to access balance history for account that was deleted
         if account_id not in self.accounts:
             return None
         
@@ -354,6 +354,7 @@ class BankingSystemImpl(BankingSystem):
         
         # apply cashback if needed
         self.cashback(time_at, account_id)
+        self.cashback(timestamp, account_id)
 
         # get timestamp keys corresponding to balances logged at or before time_at
         time_at_or_earlier_timestamps = [key for key in self.accounts[account_id]["balance"] if key <= time_at]
