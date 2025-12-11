@@ -148,6 +148,7 @@ class BankingSystemImpl(BankingSystem):
             transfer_sum_log_str.append(transfer_sum_str)
         return transfer_sum_log_str
 
+
     def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
         """
         Should withdraw the given amount of money from the specified
@@ -182,11 +183,12 @@ class BankingSystemImpl(BankingSystem):
         
         self.cashback(timestamp, account_id)
 
-        if amount > self.accounts[account_id]["balance"]:
+        if amount > self.accounts[account_id]["current_balance"]:
             return None
         
         #balance structure needs to be changed to store balance + timestamp
-        self.accounts[account_id]["balance"] -= amount
+        self.accounts[account_id]["balance"]["timestamp"] = self.accounts[account_id]["current_balance"] - amount
+        self.accounts[account_id]["current_balance"] -= amount
         self.accounts[account_id]["transfers"][timestamp] = amount
         
         pay_count = len(self.pay_log) + 1
@@ -200,6 +202,7 @@ class BankingSystemImpl(BankingSystem):
         self.accounts[account_id]["payments"].append(pay_str)
 
         return pay_str
+
 
     def get_payment_status(self, timestamp: int, account_id: str, payment: str) -> str | None:
         """
@@ -283,9 +286,12 @@ class BankingSystemImpl(BankingSystem):
 
         return True
 
+        
+
         """
         
-        # default implementation
+        self.accounts[account_id_1].setdefault("merged_account_history", []).append(account_id_2)
+
         return False
 
     def get_balance(self, timestamp: int, account_id: str, time_at: int) -> int | None:
@@ -299,24 +305,29 @@ class BankingSystemImpl(BankingSystem):
           query has been processed.
           * If the account was merged into another account, the merged
           account should inherit its balance history.
+        Parameters
+        ----------
+        timestamp: current datetime
+        account_id: unique account identifier
+        time_at: query timestamp to look up account balance
         """
-        """
-        #PSEUDOCODE - may not be entirely correct:
         
-        #check if account exists at timestamp
-        creation_timestamp = self.accounts[account_id]["account_created"]
-        if time_at < creation_timestamp
-          return None
+        if account_id not in self.accounts:
+            # check whether account_id was merged into another existing account
+            for key, value in self.accounts.items():
+                if account_id in value.get("merged_account_history", []):
+                    account_id = key
+                    break
+        # check again
+        if account_id not in self.accounts:
+            return None
+                
+        if self.accounts[account_id]["account_created"] > time_at:
+            return None
         
-        #call cashback
-        self.cashback(timestamp, account_id)
-        #get balance
-        #balance structure needs to be changed to store balance + timestamp
-        balance = self.accounts[account_id]["balance"]
-        #search downward from time_at to nearest valid timestamp in balance, find balance at that timestamp
-        #then return balance at that timestamp
-        return balance
+        time_at_or_earlier_timestamps = [key for key in self.accounts[account_id]["balance"] if key <= time_at]
+        if len(time_at_or_earlier_timestamps) == 0:
+            return 0  # no account activity since creation
+        else:
+            return self.accounts[account_id]["balance"][max(time_at_or_earlier_timestamps)]
 
-        # list(d.keys())[-1] gives most recent key
-        """
-        
