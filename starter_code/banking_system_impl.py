@@ -15,8 +15,10 @@ class BankingSystemImpl(BankingSystem):
                   CB += CB_amount
                   self.pay_log[payment] = (pay_account_id, CB_timestamp, CB_amount, True)
         #balance structure needs to be changed to store balance + timestamp
-        self.accounts[account_id]["current_balance"] += CB
-        self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
+        if CB >0:
+            self.accounts[account_id]["current_balance"] += CB
+            if timestamp not in self.accounts[account_id]["balance"]:
+                self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
     
         return None
     
@@ -293,11 +295,7 @@ class BankingSystemImpl(BankingSystem):
         
         if account_id_1 not in self.accounts or account_id_2 not in self.accounts:
             return False
-
-        # process pending payments
-        self.cashback(timestamp, account_id_1)
-        self.cashback(timestamp, account_id_2)
-        
+       
         # create or update merged_account_history as account_id_1 dictionary key:value
         # merged_account_history stores a set of merged account ids, adding both the
         # merged account_id_2 and the merger history of account_id_2 to account_id_1's
@@ -308,8 +306,8 @@ class BankingSystemImpl(BankingSystem):
         # now merge by updating individual account variables/data structures
         self.accounts[account_id_1]["current_balance"] += self.accounts[account_id_2]["current_balance"]
         
-        merged_balance = {**self.accounts[account_id_1]["balance"], **self.accounts[account_id_2]["balance"]}
-        self.accounts[account_id_1]["balance"] = dict(sorted(merged_balance.items()))
+        # only add the new balance to account_id_1 (do not transfer over account_id_2 balance history)
+        self.accounts[account_id_1]["balance"][timestamp] = self.accounts[account_id_1]["current_balance"]
         
         merged_transfers = {**self.accounts[account_id_1]["transfers"], **self.accounts[account_id_2]["transfers"]}
         self.accounts[account_id_1]["transfers"] = dict(sorted(merged_transfers.items()))
@@ -320,6 +318,9 @@ class BankingSystemImpl(BankingSystem):
         # update master pay_log to reflect new account synonyms
         for payment, payment_record in self.pay_log.items():
             self.pay_log[payment] = (payment_record[0].replace(account_id_2, account_id_1), *payment_record[1:])
+
+        # process pending payments
+        self.cashback(timestamp, account_id_1)
 
         # remove account_id_2 from accounts
         self.accounts.pop(account_id_2)
@@ -346,18 +347,15 @@ class BankingSystemImpl(BankingSystem):
         """
         
         if account_id not in self.accounts:
-            # check whether account_id was merged into another existing account
-            for key, value in self.accounts.items():
-                if account_id in value.get("merged_account_history", []):
-                    account_id = key
-                    break
-        # check again
-        if account_id not in self.accounts:
             return None
-                
+        
         if self.accounts[account_id]["account_created"] > time_at:
             return None
         
+        # apply cashback if needed
+        self.cashback(time_at, account_id)
+
+        # get timestamp keys corresponding to balances logged at or before time_at
         time_at_or_earlier_timestamps = [key for key in self.accounts[account_id]["balance"] if key <= time_at]
         if len(time_at_or_earlier_timestamps) == 0:
             return 0  # no account activity since creation
