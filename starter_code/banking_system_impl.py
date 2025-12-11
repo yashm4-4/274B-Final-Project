@@ -295,6 +295,10 @@ class BankingSystemImpl(BankingSystem):
         
         if account_id_1 not in self.accounts or account_id_2 not in self.accounts:
             return False
+
+        # process pending payments
+        self.cashback(timestamp, account_id_1)
+        self.cashback(timestamp, account_id_2)
        
         # create or update merged_account_history as account_id_1 dictionary key:value
         # merged_account_history stores a set of merged account ids, adding both the
@@ -309,6 +313,11 @@ class BankingSystemImpl(BankingSystem):
         # only add the new balance to account_id_1 (do not transfer over account_id_2 balance history)
         self.accounts[account_id_1]["balance"][timestamp] = self.accounts[account_id_1]["current_balance"]
         
+        #implement merged_balance similar to below.
+        #account 1: (1, balance 1) , (3, balance 1.1)
+        #account2: (1, balance2), (2, balance 2.1)
+        #mergedaccount: (1, balance 1 + balance 2) (2, balance2.1 + increase in earlier balance)
+        
         merged_transfers = {**self.accounts[account_id_1]["transfers"], **self.accounts[account_id_2]["transfers"]}
         self.accounts[account_id_1]["transfers"] = dict(sorted(merged_transfers.items()))
         
@@ -319,8 +328,7 @@ class BankingSystemImpl(BankingSystem):
         for payment, payment_record in self.pay_log.items():
             self.pay_log[payment] = (payment_record[0].replace(account_id_2, account_id_1), *payment_record[1:])
 
-        # process pending payments
-        self.cashback(timestamp, account_id_1)
+        #need to update CB payments?
 
         # remove account_id_2 from accounts
         self.accounts.pop(account_id_2)
@@ -357,6 +365,9 @@ class BankingSystemImpl(BankingSystem):
 
         #search in merge log if input account has been merged, then check call get_balance on correct account?
         if account_id not in self.accounts:
+            #search merged account history set to see if input arg has been merged
+                #if you find that its been merged into new account: get_balance(new account, time_at)
+                    #what balance? combined balance of acc1 + acc2? only acc2?
             return None
         
         if self.accounts[account_id]["account_created"] > time_at:
@@ -372,4 +383,5 @@ class BankingSystemImpl(BankingSystem):
             return 0  # no account activity since creation
         else:
             return self.accounts[account_id]["balance"][max(time_at_or_earlier_timestamps)]
+
 
