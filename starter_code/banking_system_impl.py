@@ -291,17 +291,41 @@ class BankingSystemImpl(BankingSystem):
         if account_id_1 == account_id_2:
             return False
         
-        if account_id_1 or account_id_2 not in self.accounts:
+        if account_id_1 not in self.accounts or account_id_2 not in self.accounts:
             return False
-        
+
+        # process pending payments
         self.cashback(timestamp, account_id_1)
         self.cashback(timestamp, account_id_2)
-
+        
+        # create or update merged_account_history as account_id_1 dictionary key:value
+        # merged_account_history stores a set of merged account ids, adding both the
+        # merged account_id_2 and the merger history of account_id_2 to account_id_1's
+        # merged_account_history
         self.accounts[account_id_1].setdefault("merged_account_history", set()).update(
             {account_id_2}.union(self.accounts[account_id_2].get("merged_account_history", set())))
 
+        # now merge by updating individual account variables/data structures
+        self.accounts[account_id_1]["current_balance"] += self.accounts[account_id_2]["current_balance"]
+        
+        merged_balance = {**self.accounts[account_id_1]["balance"], **self.accounts[account_id_2]["balance"]}
+        self.accounts[account_id_1]["balance"] = dict(sorted(merged_balance.items()))
+        
+        merged_transfers = {**self.accounts[account_id_1]["transfers"], **self.accounts[account_id_2]["transfers"]}
+        self.accounts[account_id_1]["transfers"] = dict(sorted(merged_transfers.items()))
+        
+        merged_payments = sorted(self.accounts[account_id_1]["payments"] + self.accounts[account_id_2]["payments"])
+        self.accounts[account_id_1]["payments"] = merged_payments
+
+        # update master pay_log to reflect new account synonyms
+        for payment, payment_record in self.pay_log.items():
+            self.pay_log[payment] = (payment_record[0].replace(account_id_2, account_id_1), *payment_record[1:])
+
+        # remove account_id_2 from accounts
         self.accounts.pop(account_id_2)
 
+        return True
+    
 
     def get_balance(self, timestamp: int, account_id: str, time_at: int) -> int | None:
         """
