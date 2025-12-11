@@ -15,7 +15,8 @@ class BankingSystemImpl(BankingSystem):
                   CB += CB_amount
                   self.pay_log[payment] = (pay_account_id, CB_timestamp, CB_amount, True)
         #balance structure needs to be changed to store balance + timestamp
-        self.accounts[account_id]["balance"] += CB
+        self.accounts[account_id]["current_balance"] += CB
+        self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
     
         return None
     
@@ -38,6 +39,7 @@ class BankingSystemImpl(BankingSystem):
             #balance structure needs to be changed to store balance + timestamp. Done here
             self.accounts[account_id]["balance"] = {}
             self.accounts[account_id]["balance"][timestamp] = 0
+            self.accounts[account_id]["current_balance"] = 0
             #self.accounts[account_id]["deposits"] = {} #i think we can get rid of this
             self.accounts[account_id]["transfers"] = {}
             self.accounts[account_id]["payments"] = []
@@ -60,8 +62,11 @@ class BankingSystemImpl(BankingSystem):
 
           #self.accounts[account_id]["deposits"][timestamp] = amount #i think we can get rid of this. its unused later and complicates CB
           #balance structure needs to be changed to store balance + timestamp
-          self.accounts[account_id]["balance"] += amount
-          return self.accounts[account_id]["balance"]
+          self.accounts[account_id]["current_balance"] += amount
+          self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
+    
+          return self.accounts[account_id]["current_balance"]
+        
         else:
           return None
 
@@ -88,12 +93,15 @@ class BankingSystemImpl(BankingSystem):
             self.cashback(timestamp, target_account_id)
 
             #balance structure needs to be changed to store balance + timestamp
-            if self.accounts[source_account_id]["balance"] - amount >= 0:
-              self.accounts[source_account_id]["balance"] -= amount
-              self.accounts[target_account_id]["balance"] += amount
+            if self.accounts[source_account_id]["current_balance"] - amount >= 0:
+              self.accounts[source_account_id]["current_balance"] -= amount
+              self.accounts[target_account_id]["current_balance"] += amount
+              self.accounts[source_account_id]["balance"][timestamp] = self.accounts[source_account_id]["current_balance"]
+              self.accounts[target_account_id]["balance"][timestamp] = self.accounts[target_account_id]["current_balance"]
+    
               #self.accounts[target_account_id]["deposits"][timestamp] = amount #i think we can get rid of this
               self.accounts[source_account_id]["transfers"][timestamp] = amount
-              return self.accounts[source_account_id]["balance"]
+              return self.accounts[source_account_id]["current_balance"]
             else:
               return None
             
@@ -267,6 +275,8 @@ class BankingSystemImpl(BankingSystem):
         each account into transaction list and balance list, then sort by timestamp
         update new account with transaction list and balance list by feeding it to their dicts
 
+        (transaction1, 1) (transaction2, 2) (transaction 1, 1)
+        
         top spenders will work if the above is done correctly
 
         remove everything for account 2 
@@ -295,7 +305,7 @@ class BankingSystemImpl(BankingSystem):
         
         #check if account exists at timestamp
         creation_timestamp = self.accounts[account_id]["account_created"]
-        if timestamp < creation_timestamp
+        if time_at < creation_timestamp
           return None
         
         #call cashback
@@ -307,5 +317,6 @@ class BankingSystemImpl(BankingSystem):
         #then return balance at that timestamp
         return balance
 
+        # list(d.keys())[-1] gives most recent key
         """
         
