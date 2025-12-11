@@ -353,8 +353,9 @@ class BankingSystemImpl(BankingSystem):
             return None
         
         # apply cashback if needed
+        
         self.cashback(time_at, account_id)
-        self.cashback(timestamp, account_id)
+        
 
         # get timestamp keys corresponding to balances logged at or before time_at
         time_at_or_earlier_timestamps = [key for key in self.accounts[account_id]["balance"] if key <= time_at]
