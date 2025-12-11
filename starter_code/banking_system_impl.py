@@ -187,7 +187,7 @@ class BankingSystemImpl(BankingSystem):
             return None
         
         #balance structure needs to be changed to store balance + timestamp
-        self.accounts[account_id]["balance"]["timestamp"] = self.accounts[account_id]["current_balance"] - amount
+        self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"] - amount
         self.accounts[account_id]["current_balance"] -= amount
         self.accounts[account_id]["transfers"][timestamp] = amount
         
