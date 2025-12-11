@@ -345,7 +345,17 @@ class BankingSystemImpl(BankingSystem):
         account_id: unique account identifier
         time_at: query timestamp to look up account balance
         """
+        #this may be wrong if we need to access balance history for account that was deleted
+        #this is causing a failure - confirmed
+        #self.assertEqual(self.system.get_balance(28, 'account3', 13), 600) - we return None
+        #account 3 was merged into different account previously. need to be able to search by deleted... 
+        #...account to get history of new account it was merged into.
         
+        #self.assertEqual(self.system.get_balance(86400043, 'acc2', 19), 8094)- we return None
+        #again we are failing because acc2 was merged into acc1 already, so acc2 doesnt exist
+        #we need some way to search by deleted accounts. maybe store a merge log or something
+
+        #search in merge log if input account has been merged, then check call get_balance on correct account?
         if account_id not in self.accounts:
             return None
         
@@ -353,8 +363,9 @@ class BankingSystemImpl(BankingSystem):
             return None
         
         # apply cashback if needed
+        
         self.cashback(time_at, account_id)
-
+        
         # get timestamp keys corresponding to balances logged at or before time_at
         time_at_or_earlier_timestamps = [key for key in self.accounts[account_id]["balance"] if key <= time_at]
         if len(time_at_or_earlier_timestamps) == 0:
