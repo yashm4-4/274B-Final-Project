@@ -179,7 +179,7 @@ class BankingSystemImpl(BankingSystem):
         pay_str = "payment" + str(pay_count)
 
         CB_timestamp = timestamp + 86400000
-        CB_amount = 0.02 * amount
+        CB_amount = np.floor(0.02 * amount) #round down to nearest int, per instructions
         CB_status = False
 
         self.pay_log[pay_str] = (account_id, CB_timestamp, CB_amount, CB_status)
