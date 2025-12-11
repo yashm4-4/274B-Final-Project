@@ -246,7 +246,6 @@ class BankingSystemImpl(BankingSystem):
           merge.
         """
 
-
         """
         do these checks:
         Returns `False` if `account_id_1` is equal to
@@ -269,12 +268,9 @@ class BankingSystemImpl(BankingSystem):
 
         top spenders will work if the above is done correctly
 
-        remove everything for account 2 
-
+        remove everything for account 2
         return True
-
-        """
-        
+        """ 
         # default implementation
         return False
 
