@@ -286,13 +286,22 @@ class BankingSystemImpl(BankingSystem):
 
         return True
 
-        
-
         """
         
-        self.accounts[account_id_1].setdefault("merged_account_history", []).append(account_id_2)
+        if account_id_1 == account_id_2:
+            return False
+        
+        if account_id_1 or account_id_2 not in self.accounts:
+            return False
+        
+        self.cashback(timestamp, account_id_1)
+        self.cashback(timestamp, account_id_2)
 
-        return False
+        self.accounts[account_id_1].setdefault("merged_account_history", set()).update(
+            {account_id_2}.union(self.accounts[account_id_2].get("merged_account_history", set())))
+
+        self.accounts.pop(account_id_2)
+
 
     def get_balance(self, timestamp: int, account_id: str, time_at: int) -> int | None:
         """
