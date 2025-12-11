@@ -5,8 +5,19 @@ class BankingSystemImpl(BankingSystem):
 
     def __init__(self):
         self.accounts = {}
-        
+        self.pay_log = {}
 
+    def cashback(self, timestamp: int, account_id: str) -> None:
+        CB = 0
+        for payment in self.accounts[account_id]["payments"]:
+              pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[payment]
+              if CB_timestamp <= timestamp and CB_status == False:
+                  CB += CB_amount
+                  self.pay_log[payment] = (pay_account_id, CB_timestamp, CB_amount, True)
+        self.accounts[account_id]["balance"] += CB
+    
+        return None
+    
     def create_account(self, timestamp: int, account_id: str) -> bool:
         """
         Parameters
@@ -22,10 +33,11 @@ class BankingSystemImpl(BankingSystem):
             return False
         else:
             self.accounts[account_id] = {}
-            self.accounts[account_id]["account_created"] = timestamp
+            #self.accounts[account_id]["account_created"] = timestamp #i think we can get rid of this. not sure yet
             self.accounts[account_id]["balance"] = 0
-            self.accounts[account_id]["deposits"] = {}
+            #self.accounts[account_id]["deposits"] = {} #i think we can get rid of this
             self.accounts[account_id]["transfers"] = {}
+            self.accounts[account_id]["payments"] = []
             return True
 
     def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
@@ -40,7 +52,10 @@ class BankingSystemImpl(BankingSystem):
         account balance, or 'None' if account does not exist
         """
         if account_id in self.accounts:  
-          self.accounts[account_id]["deposits"][timestamp] = amount
+          #cashback
+          self.cashback(timestamp, account_id)
+
+          #self.accounts[account_id]["deposits"][timestamp] = amount #i think we can get rid of this. its unused later and complicates CB
           self.accounts[account_id]["balance"] += amount
           return self.accounts[account_id]["balance"]
         else:
@@ -59,15 +74,19 @@ class BankingSystemImpl(BankingSystem):
         balance of source_account_id, or 'None' if source_account_id or target_account_id do not exist
         or if source and target accounts are the same, or if insufficient funds for transfer.
         """
+        
         if source_account_id not in self.accounts or target_account_id not in self.accounts:
             return None
         if source_account_id == target_account_id:
-              return None
+            return None
         else:
+            self.cashback(timestamp, source_account_id)
+            self.cashback(timestamp, target_account_id)
+
             if self.accounts[source_account_id]["balance"] - amount >= 0:
               self.accounts[source_account_id]["balance"] -= amount
               self.accounts[target_account_id]["balance"] += amount
-              self.accounts[target_account_id]["deposits"][timestamp] = amount
+              #self.accounts[target_account_id]["deposits"][timestamp] = amount #i think we can get rid of this
               self.accounts[source_account_id]["transfers"][timestamp] = amount
               return self.accounts[source_account_id]["balance"]
             else:
@@ -144,8 +163,29 @@ class BankingSystemImpl(BankingSystem):
           amount must be refunded to the account before any other
           transactions are performed at the relevant timestamp.
         """
-        # default implementation
-        return None
+
+        if account_id not in self.accounts:
+            return None
+        
+        self.cashback(timestamp, account_id)
+
+        if amount > self.accounts[account_id]["balance"]:
+            return None
+        
+        self.accounts[account_id]["balance"] -= amount
+        self.accounts[account_id]["transfers"][timestamp] = amount
+        
+        pay_count = len(self.pay_log) + 1
+        pay_str = "payment" + str(pay_count)
+
+        CB_timestamp = timestamp + 86400000
+        CB_amount = 0.02 * amount
+        CB_status = False
+
+        self.pay_log[pay_str] = (account_id, CB_timestamp, CB_amount, CB_status)
+        self.accounts[account_id]["payments"].append(pay_str)
+
+        return pay_str
 
     def get_payment_status(self, timestamp: int, account_id: str, payment: str) -> str | None:
         """
@@ -160,8 +200,20 @@ class BankingSystemImpl(BankingSystem):
           * Returns a string representing the payment status:
           `"IN_PROGRESS"` or `"CASHBACK_RECEIVED"`.
         """
-        # default implementation
-        return None
+        if account_id not in self.accounts:
+            return None
+        if payment not in self.pay_log:
+            return None
+        
+        payment_info = self.pay_log[payment]
+        #payment_info = (account_id, CB_timestamp, CB_amount, CB_status)
+        if payment_info[0] != account_id:
+            return None
+        else:
+            if timestamp < payment_info[1]:
+                return "IN_PROGRESS"
+            else:
+                return "CASHBACK_RECEIVED"
 
     def merge_accounts(self, timestamp: int, account_id_1: str, account_id_2: str) -> bool:
         """
@@ -203,4 +255,5 @@ class BankingSystemImpl(BankingSystem):
           account should inherit its balance history.
         """
         # default implementation
+        #consider depositing (0) to handle cashbacks before getting balance
         return None
