@@ -294,3 +294,6 @@ class Level2Tests(unittest.TestCase):
         self.assertEqual(self.system.transfer(51, 'acc4', 'acc1', 136), 523)
         expected = ['acc4(782)', 'acc3(459)', 'acc2(282)', 'acc1(271)', 'acc5(220)', 'acc10(0)', 'acc6(0)', 'acc7(0)', 'acc8(0)', 'acc9(0)']
         self.assertEqual(self.system.top_spenders(52, 10), expected)
+
+if __name__ == "__main__":
+    unittest.main()

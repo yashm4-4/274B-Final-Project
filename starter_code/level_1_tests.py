@@ -318,3 +318,6 @@ class Level1Tests(unittest.TestCase):
         self.assertEqual(self.system.transfer(158, 'acc10', 'acc2', 902), 357)
         self.assertEqual(self.system.transfer(159, 'acc9', 'acc6', 921), 4281)
         self.assertEqual(self.system.transfer(160, 'acc8', 'acc6', 404), 3367)
+
+if __name__ == "__main__":
+    unittest.main()

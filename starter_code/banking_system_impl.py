@@ -1,12 +1,13 @@
 from banking_system import BankingSystem
-
+import numpy as np
 
 class BankingSystemImpl(BankingSystem):
 
     def __init__(self):
         self.accounts = {}
+        
 
-def create_account(self, timestamp: int, account_id: str) -> bool:
+    def create_account(self, timestamp: int, account_id: str) -> bool:
         """
         Parameters
         ----------
@@ -91,9 +92,29 @@ def create_account(self, timestamp: int, account_id: str) -> bool:
           should not be reflected in the calculations for total
           outgoing transactions.
         """
-        transfer_amounts = [np.sum(self.accounts[account_id]["transfers"][timestamp]) for timestamp in self.accounts[account_id]["transfers"] for account_id in self.accounts]
+        transfer_sum_log = []
+        #sum all transactions for each account
+        for account_id in self.accounts:
+            transfer_sum = 0
+            for timestamp in self.accounts[account_id]["transfers"]:
+                transfer_sum += np.sum(self.accounts[account_id]["transfers"][timestamp])
+            transfer_sum_log.append((account_id, transfer_sum))
         
-        return []
+        #sort by decreasing transfer sum, then increasing account name if tie
+        transfer_sum_log.sort(key=lambda x: (-x[1], x[0]))
+
+        #ensure n top spenders is at most equal to number of accounts
+        if n > len(transfer_sum_log):
+            n_correct = len(transfer_sum_log)
+        else:
+            n_correct = n
+        
+        #build final list of strings
+        transfer_sum_log_str = []
+        for i in range(n_correct):
+            transfer_sum_str = transfer_sum_log[i][0] + "(" + str(transfer_sum_log[i][1]) +")"
+            transfer_sum_log_str.append(transfer_sum_str)
+        return transfer_sum_log_str
 
     def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
         """

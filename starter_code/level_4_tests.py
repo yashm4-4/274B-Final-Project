@@ -289,3 +289,6 @@ class Level4Tests(unittest.TestCase):
         self.assertIsNone(self.system.get_balance(86400068, 'acc7', 86400047))
         self.assertIsNone(self.system.get_balance(86400069, 'acc8', 86400048))
         self.assertIsNone(self.system.get_balance(86400070, 'acc9', 86400049))
+
+if __name__ == "__main__":
+    unittest.main()

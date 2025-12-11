@@ -260,3 +260,6 @@ class Level3Tests(unittest.TestCase):
         self.assertEqual(self.system.get_payment_status(172800042, 'acc3', 'payment12'), 'IN_PROGRESS')
         self.assertEqual(self.system.get_payment_status(172800043, 'acc2', 'payment11'), 'CASHBACK_RECEIVED')
         self.assertEqual(self.system.get_payment_status(172800044, 'acc1', 'payment10'), 'CASHBACK_RECEIVED')
+
+if __name__ == "__main__":
+    unittest.main()
