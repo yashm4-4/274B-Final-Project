@@ -38,6 +38,7 @@ class BankingSystemImpl(BankingSystem):
             #balance structure needs to be changed to store balance + timestamp. Done here
             self.accounts[account_id]["balance"] = {}
             self.accounts[account_id]["balance"][timestamp] = 0
+            self.accounts[account_id]["current_balance"] = 0
             #self.accounts[account_id]["deposits"] = {} #i think we can get rid of this
             self.accounts[account_id]["transfers"] = {}
             self.accounts[account_id]["payments"] = []
@@ -264,7 +265,8 @@ class BankingSystemImpl(BankingSystem):
         Need to merge balance history and transaction history
         timesteps may not match, so add (transaction, timestamp), (balance, timestamp) for
         each account into transaction list and balance list, then sort by timestamp
-        update new account with transaction list and balance list by feeding it to their dicts
+        update new account with transaction list and balance list by feeding it to their dicts.
+        add transaction if on same time step. add balance in timestamp order
 
         top spenders will work if the above is done correctly
 
