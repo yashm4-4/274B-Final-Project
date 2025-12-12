@@ -371,7 +371,7 @@ class BankingSystemImpl(BankingSystem):
             return None
         
         if self.accounts[account_id]["account_created"] > time_at:
-            return None
+            break
         
         # apply cashback if needed
         
@@ -383,5 +383,6 @@ class BankingSystemImpl(BankingSystem):
             return 0  # no account activity since creation
         else:
             return self.accounts[account_id]["balance"][max(time_at_or_earlier_timestamps)]
+
 
 
