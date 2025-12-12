@@ -376,17 +376,49 @@ class BankingSystemImpl(BankingSystem):
         #we need some way to search by deleted accounts. maybe store a merge log or something
 
         #search in merge log if input account has been merged, then check call get_balance on correct account?
-        if account_id not in self.accounts:
+        #if account_id not in self.accounts:
             #search merged account history set to see if input arg has been merged
                 #if you find that its been merged into new account: get_balance(new account, time_at)
                     #what balance? combined balance of acc1 + acc2? only acc2?
-            return None
+            #return None
         
+        #if self.accounts[account_id]["account_created"] > time_at:
+            #return None
+        
+        ####-----------------------------------
+        
+        if account_id not in self.accounts:
+            #search for the deleted account in existing accounts merge histories
+            for existing_account in self.accounts:
+                if account_id in self.accounts[existing_account].get("merged_account_history", set()):
+                    #get balance history
+                    merged_histories = self.accounts[existing_account].get("merged_balance_histories", {})
+                    deleted_balance, merge_timestamp = merged_histories[account_id]
+                        
+                    #check when we are querying: before or after merger
+                    if time_at >= merge_timestamp:
+                        return None
+                        
+                    time_account_created = min(deleted_balance.keys())
+                    if time_account_created > time_at:
+                        return None
+                        
+                    #balance at time_at or earlier
+                    time_at_or_before = [x for x in deleted_balance if x <= time_at]
+                    if len(time_at_or_before) == 0:
+                        return 0
+                    return deleted_balance[max(time_at_or_before)] 
+            
+            #account never existed if not found
+            return None
+            
+        #check if querying before account was created
         if self.accounts[account_id]["account_created"] > time_at:
             return None
         
-        # apply cashback if needed
+        ####-----------------------------------  
         
+        # apply cashback if needed
         self.cashback(time_at, account_id)
         
         # get timestamp keys corresponding to balances logged at or before time_at
