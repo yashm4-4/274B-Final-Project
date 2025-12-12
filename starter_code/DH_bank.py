@@ -11,6 +11,7 @@ class BankingSystemImpl(BankingSystem):
     def __init__(self):
         self.accounts = {}
         self.pay_log = {}
+        self._payment_counter = 0  # ADDED: guarantees unique payment ids even after merges/history changes
 
     def cashback(self, timestamp: int, account_id: str) -> None:
         """
@@ -26,19 +27,23 @@ class BankingSystemImpl(BankingSystem):
 
         acc = self.accounts[account_id]
 
+        # ADDED: process due refunds in increasing CB_timestamp order for consistent history snapshots
+        due = []
         for payment in acc["payments"]:
             pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[payment]
-
-            # Only process cashback if it is due AND not already processed.
             if (not CB_status) and CB_timestamp <= timestamp:
-                acc["current_balance"] += CB_amount
+                due.append((CB_timestamp, payment, CB_amount, pay_account_id))
 
-                # IMPORTANT: record the snapshot at the cashback timestamp itself.
-                # This is needed for correct historical get_balance queries (Level 4).
-                acc["balance"][CB_timestamp] = acc["current_balance"]
+        due.sort()  # ADDED: ensures chronological processing
 
-                # Mark cashback as processed so it will not be applied again.
-                self.pay_log[payment] = (pay_account_id, CB_timestamp, CB_amount, True)
+        for CB_timestamp, payment, CB_amount, pay_account_id in due:
+            acc["current_balance"] += int(CB_amount)
+
+            # IMPORTANT: record the snapshot at the cashback timestamp itself.
+            acc["balance"][CB_timestamp] = acc["current_balance"]
+
+            # Mark cashback as processed so it will not be applied again.
+            self.pay_log[payment] = (pay_account_id, CB_timestamp, int(CB_amount), True)
 
         return None
 
@@ -103,7 +108,6 @@ class BankingSystemImpl(BankingSystem):
                 self.accounts[target_account_id]["balance"][timestamp] = self.accounts[target_account_id]["current_balance"]
 
                 # FIX: accumulate outgoing at the same timestamp instead of overwriting.
-                # Multiple transactions can occur at the same timestamp.
                 self.accounts[source_account_id]["transfers"][timestamp] = (
                     self.accounts[source_account_id]["transfers"].get(timestamp, 0) + amount
                 )
@@ -122,20 +126,13 @@ class BankingSystemImpl(BankingSystem):
         for account_id in self.accounts:
             transfer_sum = 0
             for ts in self.accounts[account_id]["transfers"]:
-                # ensure int (avoid numpy/float confusion)
                 transfer_sum += int(self.accounts[account_id]["transfers"][ts])
             transfer_sum_log.append((account_id, transfer_sum))
 
         transfer_sum_log.sort(key=lambda x: (-x[1], x[0]))
-
         n_correct = min(n, len(transfer_sum_log))
 
-        transfer_sum_log_str = []
-        for i in range(n_correct):
-            transfer_sum_str = transfer_sum_log[i][0] + "(" + str(transfer_sum_log[i][1]) + ")"
-            transfer_sum_log_str.append(transfer_sum_str)
-
-        return transfer_sum_log_str
+        return [f"{acc}({total})" for acc, total in transfer_sum_log[:n_correct]]
 
     def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
         """
@@ -155,13 +152,14 @@ class BankingSystemImpl(BankingSystem):
         self.accounts[account_id]["current_balance"] -= amount
         self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
 
-        # Outgoing includes pay (withdrawals).
+        # Outgoing includes pay (withdrawals). Accumulate per timestamp.
         self.accounts[account_id]["transfers"][timestamp] = (
             self.accounts[account_id]["transfers"].get(timestamp, 0) + amount
         )
 
-        pay_count = len(self.pay_log) + 1
-        pay_str = "payment" + str(pay_count)
+        # CHANGED: use a dedicated counter so ids are always unique and sequential.
+        self._payment_counter += 1  # ADDED: stable ordinal even if pay_log size changes indirectly
+        pay_str = "payment" + str(self._payment_counter)
 
         CB_timestamp = timestamp + DAY_MS
 
@@ -189,7 +187,7 @@ class BankingSystemImpl(BankingSystem):
 
         pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[payment]
 
-        # Payment must belong to this account id (after merges, ownership may be updated).
+        # Payment must belong to this account id (after merges, we update ownership to the surviving id).
         if pay_account_id != account_id:
             return None
 
@@ -213,11 +211,15 @@ class BankingSystemImpl(BankingSystem):
         acc1 = self.accounts[account_id_1]
         acc2 = self.accounts[account_id_2]
 
+        # ADDED: store merge timestamp so deleted-id queries can return None at/after merge
+        merge_time = timestamp  # ADDED: clearer variable name for later logic
+
         # Store account2 balance history for historical queries on deleted id (Level 4).
+        # (balance_dict, created_at, merged_at)
         acc1["merged_balance_histories"][account_id_2] = (
             acc2["balance"].copy(),
             acc2["account_created"],
-            timestamp
+            merge_time
         )
 
         # If account2 had merged accounts before, inherit those histories too.
@@ -239,11 +241,12 @@ class BankingSystemImpl(BankingSystem):
         for pid in acc2["payments"]:
             pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[pid]
             if pay_account_id == account_id_2:
+                # ADDED: after merge, cashback should refund into account_id_1
                 self.pay_log[pid] = (account_id_1, CB_timestamp, CB_amount, CB_status)
 
         # Merge balances (add current balance of account2 into account1).
         acc1["current_balance"] += acc2["current_balance"]
-        acc1["balance"][timestamp] = acc1["current_balance"]
+        acc1["balance"][merge_time] = acc1["current_balance"]  # ADDED: snapshot at merge time
 
         # Merge outgoing transfer histories by summing timestamps.
         for ts, amt in acc2["transfers"].items():
@@ -258,7 +261,8 @@ class BankingSystemImpl(BankingSystem):
         """
         Return balance at time_at.
         - If account_id is deleted due to merge, it is valid only before its merge time.
-        - Root account inherits merged accounts history (sum balances for time_at < merge time).
+        - Root account does NOT retroactively include merged balances before the merge.
+          (Root only grows at merge timestamp via the snapshot we write in merge_accounts.)
         """
         # If this account id was deleted, search in merged histories.
         if account_id not in self.accounts:
@@ -267,10 +271,12 @@ class BankingSystemImpl(BankingSystem):
                 if account_id in hist:
                     bal_dict, created_at, merged_at = hist[account_id]
 
+                    # If the account didn't exist yet at time_at.
                     if time_at < created_at:
                         return None
+
+                    # After (or at) merge time, deleted id should not be queryable.
                     if time_at >= merged_at:
-                        # After merge time, the deleted id is not queryable.
                         return None
 
                     keys = [t for t in bal_dict if t <= time_at]
@@ -284,20 +290,8 @@ class BankingSystemImpl(BankingSystem):
             return None
 
         # Apply cashback first so balance reflects state after processing at that timestamp.
+        
         self.cashback(time_at, account_id)
 
         keys = [key for key in acc["balance"] if key <= time_at]
-        base = acc["balance"][max(keys)] if keys else 0
-
-        # Root account inherits merged balances BEFORE each merge timestamp.
-        total = base
-        hist = acc.get("merged_balance_histories", {})
-        for old_id, (bal_dict, created_at, merged_at) in hist.items():
-            if time_at < created_at:
-                continue
-            if time_at >= merged_at:
-                continue
-            old_keys = [t for t in bal_dict if t <= time_at]
-            total += bal_dict[max(old_keys)] if old_keys else 0
-
-        return total
+        return acc["balance"][max(keys)] if keys else 0
