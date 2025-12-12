@@ -14,7 +14,6 @@ class BankingSystemImpl(BankingSystem):
         self._payment_counter = 0
 
         self.merged_into = {}
-        # ADDED (Level 4): maps a deleted/merged account_id -> the account_id it was merged into.
         # This lets get_balance work even when the user queries an old id after a merge.
 
     def cashback(self, timestamp: int, account_id: str):
@@ -112,7 +111,7 @@ class BankingSystemImpl(BankingSystem):
                 self.accounts[source_account_id]["balance"][timestamp] = self.accounts[source_account_id]["current_balance"]
                 self.accounts[target_account_id]["balance"][timestamp] = self.accounts[target_account_id]["current_balance"]
 
-                # FIX: accumulate outgoing at the same timestamp instead of overwriting.
+                # accumulate outgoing at the same timestamp instead of overwriting.
                 self.accounts[source_account_id]["transfers"][timestamp] = (
                     self.accounts[source_account_id]["transfers"].get(timestamp, 0) + amount
                 )
@@ -162,7 +161,7 @@ class BankingSystemImpl(BankingSystem):
             self.accounts[account_id]["transfers"].get(timestamp, 0) + amount
         )
 
-        # CHANGED: use a dedicated counter so ids are always unique and sequential.
+        # use a dedicated counter so ids are always unique and sequential.
         self._payment_counter += 1  # ADDED: stable ordinal even if pay_log size changes indirectly
         pay_str = "payment" + str(self._payment_counter)
 
@@ -218,17 +217,13 @@ class BankingSystemImpl(BankingSystem):
         merge_time = timestamp
 
         self.merged_into[account_id_2] = account_id_1
-        # ADDED (Level 4): remember that account_id_2 now "points to" account_id_1.
-        # This lets get_balance(account_id_2, time_at >= merge_time) redirect to account_id_1.
 
         # If account2 had merged accounts before, make those old ids also redirect to account_id_1.
-        # (So chains like X -> account2 -> account1 still resolve correctly.)
         for old_id in acc2.get("merged_balance_histories", {}).keys():
             self.merged_into[old_id] = account_id_1
-            # ADDED: shortcut mapping for older merged ids, avoids missing them later.
-
-        # Store account2 balance history for historical queries on deleted id (Level 4).
-        # (balance_dict, created_at, merged_at)
+       
+        
+        
         acc1["merged_balance_histories"][account_id_2] = (
             acc2["balance"].copy(),
             acc2["account_created"],
@@ -243,7 +238,6 @@ class BankingSystemImpl(BankingSystem):
         # Move payments so future cashback from account2 refunds into account1
         acc1["payments"].extend(acc2["payments"])
 
-        # Optional: store payment list by merged id (helps debugging / tracing).
         acc1["merged_payments"][account_id_2] = list(acc2["payments"])
         if "merged_payments" in acc2:
             for old_id, plist in acc2["merged_payments"].items():
@@ -253,7 +247,6 @@ class BankingSystemImpl(BankingSystem):
         for pid in acc2["payments"]:
             pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[pid]
             if pay_account_id == account_id_2:
-                # ADDED: after merge, cashback should refund into account_id_1
                 self.pay_log[pid] = (account_id_1, CB_timestamp, CB_amount, CB_status)
 
         # Merge balances (add current balance of account2 into account1).
@@ -278,14 +271,11 @@ class BankingSystemImpl(BankingSystem):
           redirect to the surviving account and return that balance.
         - If time_at is BEFORE the merge, return the old account’s historical balance.
         """
-        # ADDED: if this id was merged away, follow the chain to a live id
-        # (needed because tests query get_balance using old ids after merges)
         original_id = account_id  # ADDED: keep the original id so we can still use its history if needed
         while account_id not in self.accounts and account_id in self.merged_into:
             account_id = self.merged_into[account_id]
             # ADDED: chase merge pointers until we reach an existing account
 
-        # Case 1: the original id was deleted; try using its stored history.
         if original_id not in self.accounts:
             for root_id, root_acc in self.accounts.items():
                 hist = root_acc.get("merged_balance_histories", {})
@@ -300,11 +290,11 @@ class BankingSystemImpl(BankingSystem):
                         keys = [t for t in bal_dict if t <= time_at]
                         return bal_dict[max(keys)] if keys else 0
 
-                    # AFTER merge: redirect to surviving account and return its balance.
-                    # (This is what the failing tests expect.)
-                    break  # fall through to compute live account balance below
+                    break  
 
         # Now account_id should be a live account id (or not exist at all).
+
+        
         if account_id not in self.accounts:
             return None
 
@@ -314,6 +304,7 @@ class BankingSystemImpl(BankingSystem):
             return None
 
         # Apply cashback first so the balance reflects "after processing" at time_at.
+        
         self.cashback(time_at, account_id)
 
         keys = [key for key in acc["balance"] if key <= time_at]
