@@ -137,7 +137,7 @@ class BankingSystemImpl(BankingSystem):
         for account_id in self.accounts:
             transfer_sum = 0
             for timestamp in self.accounts[account_id]["transfers"]:
-                transfer_sum += np.sum(self.accounts[account_id]["transfers"][timestamp])
+                transfer_sum += self.accounts[account_id]["transfers"][timestamp]
             transfer_sum_log.append((account_id, transfer_sum))
         
         #sort by decreasing transfer sum, then increasing account name if tie
