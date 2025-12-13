@@ -27,10 +27,9 @@ Level 2:
 - rank acounts based on outgoing transactions
 
 Level 3:
-- schedule payments with cashback
-- check the status of scheduled payments
+- create payments with cashback
+- check the status of cashback on payments
 
 Level 4:
 - merge two accounts, while retaining both accounts' balance & transaction historie
-
-- Timestamp parameter on all operations (stringified, in ms)
+- Get balance on account at a specific period in time (time_at)
