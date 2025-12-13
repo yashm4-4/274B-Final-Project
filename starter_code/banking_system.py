@@ -6,8 +6,6 @@ class BankingSystem(ABC):
     """
     `BankingSystem` interface.
     """
-    def __init__(self):
-      self.accounts = {}
 
     def create_account(self, timestamp: int, account_id: str) -> bool:
         """
@@ -16,15 +14,8 @@ class BankingSystem(ABC):
         Returns `True` if the account was successfully created or
         `False` if an account with `account_id` already exists.
         """
-        if account_id in self.accounts:
-            return False
-        else:
-            self.accounts[account_id] = {}
-            self.accounts[account_id]["account_created"] = timestamp
-            self.accounts[account_id]["balance"] = 0
-            self.accounts[account_id]["deposits"] = {}
-            self.accounts[account_id]["transfers"] = {}
-            return True
+        # default implementation
+        return None
 
     def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
         """
@@ -35,12 +26,8 @@ class BankingSystem(ABC):
         If the specified account doesn't exist, should return
         `None`.
         """
-        if account_id in self.accounts:  
-          self.accounts[account_id]["deposits"][timestamp] = amount
-          self.accounts[account_id]["balance"] += amount
-          return self.accounts[account_id]["balance"]
-        else:
-          return None
+        # default implementation
+        return None
 
     def transfer(self, timestamp: int, source_account_id: str, target_account_id: str, amount: int) -> int | None:
         """
@@ -55,19 +42,8 @@ class BankingSystem(ABC):
           * Returns `None` if account `source_account_id` has
           insufficient funds to perform the transfer.
         """
-        if source_account_id not in self.accounts or target_account_id not in self.accounts:
-            return None
-        if source_account_id == target_account_id:
-              return None
-        else:
-            if self.accounts[source_account_id]["balance"] - amount >= 0:
-              self.accounts[source_account_id]["balance"] -= amount
-              self.accounts[target_account_id]["balance"] += amount
-              self.accounts[target_account_id]["deposits"][timestamp] = amount
-              self.accounts[source_account_id]["transfers"][timestamp] = amount
-              return self.accounts[source_account_id]["balance"]
-            else:
-              return None
+        # default implementation
+        return None
             
 
     def top_spenders(self, timestamp: int, n: int) -> list[str]:
@@ -88,9 +64,8 @@ class BankingSystem(ABC):
           should not be reflected in the calculations for total
           outgoing transactions.
         """
-        transfer_amounts = [np.sum(self.accounts[account_id]["transfers"][timestamp]) for timestamp in self.accounts[account_id]["transfers"] for account_id in self.accounts]
-        
-        return []
+        # default implementation
+        return None
 
     def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
         """
