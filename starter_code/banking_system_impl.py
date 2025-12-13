@@ -6,15 +6,24 @@ class BankingSystemImpl(BankingSystem):
     def __init__(self):
         self.accounts = {}
         self.pay_log = {}
-
+    
+    #helper function for CB
     def cashback(self, timestamp: int, account_id: str) -> None:
+        """
+        Process cashback refunds due by `timestamp`.
+
+        Refunds must be applied at the cashback timestamp (CB_timestamp),
+        and the balance snapshot must be recorded at timestamp.
+        """
         CB = 0
+        #if timestamp >= CB timestamp and CB has not been payed
         for payment in self.accounts[account_id]["payments"]:
               pay_account_id, CB_timestamp, CB_amount, CB_status = self.pay_log[payment]
               if CB_timestamp <= timestamp and CB_status == False:
                   CB += CB_amount
                   self.pay_log[payment] = (pay_account_id, CB_timestamp, CB_amount, True)
-        #balance structure needs to be changed to store balance + timestamp
+        
+        #update balance by CB
         if CB >0:
             self.accounts[account_id]["current_balance"] += CB
             if timestamp not in self.accounts[account_id]["balance"]:
@@ -33,21 +42,21 @@ class BankingSystemImpl(BankingSystem):
         bool: `True` if the account was successfully created or
         `False` if an account with `account_id` already exists.
         """
+        #check if account already exists
         if account_id in self.accounts:
             return False
+        #create account
         else:
             self.accounts[account_id] = {}
             self.accounts[account_id]["account_created"] = timestamp 
-            #balance structure needs to be changed to store balance + timestamp. Done here
             self.accounts[account_id]["balance"] = {}
             self.accounts[account_id]["balance"][timestamp] = 0
             self.accounts[account_id]["current_balance"] = 0
-            #self.accounts[account_id]["deposits"] = {} #i think we can get rid of this
             self.accounts[account_id]["transfers"] = {}
             self.accounts[account_id]["payments"] = []
             return True
 
-    def deposit(self, timestamp: int, account_id: str, amount: int) -> int | None:
+    def deposit(self, timestamp: int, account_id: str, amount: int) ->  None:
         """
         Parameters
         ----------
@@ -62,8 +71,7 @@ class BankingSystemImpl(BankingSystem):
           #cashback
           self.cashback(timestamp, account_id)
 
-          #self.accounts[account_id]["deposits"][timestamp] = amount #i think we can get rid of this. its unused later and complicates CB
-          #balance structure needs to be changed to store balance + timestamp
+          #update current balance and balance history
           self.accounts[account_id]["current_balance"] += amount
           self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"]
     
@@ -72,7 +80,7 @@ class BankingSystemImpl(BankingSystem):
         else:
           return None
 
-    def transfer(self, timestamp: int, source_account_id: str, target_account_id: str, amount: int) -> int | None:
+    def transfer(self, timestamp: int, source_account_id: str, target_account_id: str, amount: int) -> None:
         """
         Parameters
         ----------
@@ -85,7 +93,7 @@ class BankingSystemImpl(BankingSystem):
         balance of source_account_id, or 'None' if source_account_id or target_account_id do not exist
         or if source and target accounts are the same, or if insufficient funds for transfer.
         """
-        
+        #check if accounts exist or if self-transfer
         if source_account_id not in self.accounts or target_account_id not in self.accounts:
             return None
         if source_account_id == target_account_id:
@@ -94,14 +102,12 @@ class BankingSystemImpl(BankingSystem):
             self.cashback(timestamp, source_account_id)
             self.cashback(timestamp, target_account_id)
 
-            #balance structure needs to be changed to store balance + timestamp
+            #update balance and transfer history
             if self.accounts[source_account_id]["current_balance"] - amount >= 0:
               self.accounts[source_account_id]["current_balance"] -= amount
               self.accounts[target_account_id]["current_balance"] += amount
               self.accounts[source_account_id]["balance"][timestamp] = self.accounts[source_account_id]["current_balance"]
               self.accounts[target_account_id]["balance"][timestamp] = self.accounts[target_account_id]["current_balance"]
-    
-              #self.accounts[target_account_id]["deposits"][timestamp] = amount #i think we can get rid of this
               self.accounts[source_account_id]["transfers"][timestamp] = amount
               return self.accounts[source_account_id]["current_balance"]
             else:
@@ -151,7 +157,7 @@ class BankingSystemImpl(BankingSystem):
         return transfer_sum_log_str
 
 
-    def pay(self, timestamp: int, account_id: str, amount: int) -> str | None:
+    def pay(self, timestamp: int, account_id: str, amount: int) -> str :
         """
         Should withdraw the given amount of money from the specified
         account.
@@ -183,12 +189,14 @@ class BankingSystemImpl(BankingSystem):
         if account_id not in self.accounts:
             return None
         
+        #apply CB if needed
         self.cashback(timestamp, account_id)
 
+        #account does not have sufficient balance for payment
         if amount > self.accounts[account_id]["current_balance"]:
             return None
         
-        #balance structure needs to be changed to store balance + timestamp
+        #update balances and transfers
         self.accounts[account_id]["balance"][timestamp] = self.accounts[account_id]["current_balance"] - amount
         self.accounts[account_id]["current_balance"] -= amount
         self.accounts[account_id]["transfers"][timestamp] = amount
@@ -196,17 +204,19 @@ class BankingSystemImpl(BankingSystem):
         pay_count = len(self.pay_log) + 1
         pay_str = "payment" + str(pay_count)
 
+        #create CB
         CB_timestamp = timestamp + 86400000
         CB_amount = np.floor(0.02 * amount) #round down to nearest int, per instructions
         CB_status = False
 
+        #update pay_log
         self.pay_log[pay_str] = (account_id, CB_timestamp, CB_amount, CB_status)
         self.accounts[account_id]["payments"].append(pay_str)
 
         return pay_str
 
 
-    def get_payment_status(self, timestamp: int, account_id: str, payment: str) -> str | None:
+    def get_payment_status(self, timestamp: int, account_id: str, payment: str) -> str :
         """
         Should return the status of the payment transaction for the
         given `payment`.
@@ -219,13 +229,17 @@ class BankingSystemImpl(BankingSystem):
           * Returns a string representing the payment status:
           `"IN_PROGRESS"` or `"CASHBACK_RECEIVED"`.
         """
+        #check if account exists and if payment was made from inputted account
         if account_id not in self.accounts:
             return None
         if payment not in self.pay_log:
             return None
         
+        #check pay log
         payment_info = self.pay_log[payment]
         #payment_info = (account_id, CB_timestamp, CB_amount, CB_status)
+        
+        #check payment status from payment info in pay log
         if payment_info[0] != account_id:
             return None
         else:
@@ -258,37 +272,6 @@ class BankingSystemImpl(BankingSystem):
           * `account_id_2` should be removed from the system after the
           merge.
         """
-
-
-        """
-        do these checks:
-        Returns `False` if `account_id_1` is equal to
-          `account_id_2`.
-          * Returns `False` if `account_id_1` or `account_id_2`
-          doesn't exist.
-        
-        call cashback on each account - this is just so they are accurate prior to merge
-
-        All pending cashback refunds for `account_id_2` should
-        still be processed, but refunded to `account_id_1` instead.
-        this is for cashbacks for CB_timestamp > timestamp
-        to do this, look at payment list for account 2. search pay log for account 2 payments
-        and replace account id with account 1
-
-        Need to merge balance history and transaction history
-        timesteps may not match, so add (transaction, timestamp), (balance, timestamp) for
-        each account into transaction list and balance list, then sort by timestamp
-        update new account with transaction list and balance list by feeding it to their dicts
-
-        (transaction1, 1) (transaction2, 2) (transaction 1, 1)
-        
-        top spenders will work if the above is done correctly
-
-        remove everything for account 2 
-
-        return True
-
-        """
         
         if account_id_1 == account_id_2:
             return False
@@ -300,24 +283,30 @@ class BankingSystemImpl(BankingSystem):
         self.cashback(timestamp, account_id_1)
         self.cashback(timestamp, account_id_2)
        
-        # create or update merged_account_history as account_id_1 dictionary key:value
-        # merged_account_history stores a set of merged account ids, adding both the
-        # merged account_id_2 and the merger history of account_id_2 to account_id_1's
         # merged_account_history
         self.accounts[account_id_1].setdefault("merged_account_history", set()).update(
             {account_id_2}.union(self.accounts[account_id_2].get("merged_account_history", set())))
-
+        
         # now merge by updating individual account variables/data structures
         self.accounts[account_id_1]["current_balance"] += self.accounts[account_id_2]["current_balance"]
+
+        #storing deleted acc's balance history separately, did not combine the balance 
+        #histories because then we overwrite and lose time stamps
+        if "merged_balance_histories" not in self.accounts[account_id_1]:
+            self.accounts[account_id_1]["merged_balance_histories"] = {}
         
-        # only add the new balance to account_id_1 (do not transfer over account_id_2 balance history)
+        #stores (balance history, merge_timestamp)
+        self.accounts[account_id_1]["merged_balance_histories"][account_id_2] = (self.accounts[account_id_2]["balance"].copy(), timestamp)
+        
+        #to check if account_id_2 has any previous merged histories
+        if "merged_balance_histories" in self.accounts[account_id_2]:
+            for inside, inside_data in self.accounts[account_id_2]["merged_balance_histories"].items():
+                self.accounts[account_id_1]["merged_balance_histories"][inside] = inside_data
+        
+        #new balance at merge timestamp with new/combined current_balance
         self.accounts[account_id_1]["balance"][timestamp] = self.accounts[account_id_1]["current_balance"]
         
-        #implement merged_balance similar to below.
-        #account 1: (1, balance 1) , (3, balance 1.1)
-        #account2: (1, balance2), (2, balance 2.1)
-        #mergedaccount: (1, balance 1 + balance 2) (2, balance2.1 + increase in earlier balance)
-        
+        #merge transfers and payments
         merged_transfers = {**self.accounts[account_id_1]["transfers"], **self.accounts[account_id_2]["transfers"]}
         self.accounts[account_id_1]["transfers"] = dict(sorted(merged_transfers.items()))
         
@@ -328,15 +317,13 @@ class BankingSystemImpl(BankingSystem):
         for payment, payment_record in self.pay_log.items():
             self.pay_log[payment] = (payment_record[0].replace(account_id_2, account_id_1), *payment_record[1:])
 
-        #need to update CB payments?
-
         # remove account_id_2 from accounts
         self.accounts.pop(account_id_2)
 
         return True
     
 
-    def get_balance(self, timestamp: int, account_id: str, time_at: int) -> int | None:
+    def get_balance(self, timestamp: int, account_id: str, time_at: int) -> int :
         """
         Should return the total amount of money in the account
         `account_id` at the given timestamp `time_at`.
@@ -353,28 +340,37 @@ class BankingSystemImpl(BankingSystem):
         account_id: unique account identifier
         time_at: query timestamp to look up account balance
         """
-        #this may be wrong if we need to access balance history for account that was deleted
-        #this is causing a failure - confirmed
-        #self.assertEqual(self.system.get_balance(28, 'account3', 13), 600) - we return None
-        #account 3 was merged into different account previously. need to be able to search by deleted... 
-        #...account to get history of new account it was merged into.
         
-        #self.assertEqual(self.system.get_balance(86400043, 'acc2', 19), 8094)- we return None
-        #again we are failing because acc2 was merged into acc1 already, so acc2 doesnt exist
-        #we need some way to search by deleted accounts. maybe store a merge log or something
-
-        #search in merge log if input account has been merged, then check call get_balance on correct account?
         if account_id not in self.accounts:
-            #search merged account history set to see if input arg has been merged
-                #if you find that its been merged into new account: get_balance(new account, time_at)
-                    #what balance? combined balance of acc1 + acc2? only acc2?
+            #search for the deleted account in existing accounts merge histories
+            for existing_account in self.accounts:
+                if account_id in self.accounts[existing_account].get("merged_account_history", set()):
+                    #get balance history
+                    merged_histories = self.accounts[existing_account].get("merged_balance_histories", {})
+                    deleted_balance, merge_timestamp = merged_histories[account_id]
+                        
+                    #check when we are querying: before or after merger
+                    if time_at >= merge_timestamp:
+                        return None
+                        
+                    time_account_created = min(deleted_balance.keys())
+                    if time_account_created > time_at:
+                        return None
+                        
+                    #balance at time_at or earlier
+                    time_at_or_before = [x for x in deleted_balance if x <= time_at]
+                    if len(time_at_or_before) == 0:
+                        return 0
+                    return deleted_balance[max(time_at_or_before)] 
+            
+            #account never existed if not found
             return None
-        
+            
+        #check if querying before account was created
         if self.accounts[account_id]["account_created"] > time_at:
             return None 
         
         # apply cashback if needed
-        
         self.cashback(time_at, account_id)
         
         # get timestamp keys corresponding to balances logged at or before time_at
@@ -383,7 +379,5 @@ class BankingSystemImpl(BankingSystem):
             return 0  # no account activity since creation
         else:
             return self.accounts[account_id]["balance"][max(time_at_or_earlier_timestamps)]
-
-
 
 
